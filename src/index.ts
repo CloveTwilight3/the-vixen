@@ -12,12 +12,18 @@ if (!config.token) {
   process.exit(1);
 }
 
+if (!config.clientId) {
+  console.error('Error: Client ID is not configured');
+  console.error('Please check your .env file and set CLIENT_ID');
+  process.exit(1);
+}
+
 // Initialize the bot
 initBot()
   .then(() => {
     console.log('Bot initialization completed successfully');
   })
-  .catch(error => {
+  .catch((error: Error) => {
     console.error('Bot initialization failed:', error);
     process.exit(1);
   });
@@ -37,7 +43,7 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Promise Rejection:', reason);
 });
 
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', (error: Error) => {
   console.error('Uncaught Exception:', error);
   process.exit(1);
 });

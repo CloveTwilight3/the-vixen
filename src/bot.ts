@@ -104,7 +104,7 @@ function setupEventHandlers(): void {
   client.on(Events.InteractionCreate, async (interaction: Interaction) => {
     if (!interaction.isCommand()) return;
     
-    handleCommandInteraction(interaction);
+    handleCommandInteraction(interaction as CommandInteraction);
   });
   
   // Message event - handle prefix commands and PluralKit integration
@@ -128,6 +128,13 @@ function setupEventHandlers(): void {
                      client.commands.find(cmd => cmd.aliases?.includes(commandName));
       
       if (!command) return;
+      
+      // Only process regular commands via slash commands except PluralKit commands
+      // which should work with the prefix
+      if (!command.isPluralKitCommand) {
+        await message.reply(`Please use slash commands for standard bot features. Try using /${commandName} instead of ${config.prefix}${commandName}`);
+        return;
+      }
       
       try {
         await command.execute(message, args);
@@ -157,19 +164,33 @@ async function handleCommandInteraction(interaction: CommandInteraction): Promis
   }
   
   try {
-    await command.executeInteraction(interaction);
+    // Check if executeInteraction method exists before calling it
+    if (command.executeInteraction) {
+      await command.executeInteraction(interaction);
+    } else {
+      await interaction.reply({ 
+        content: 'This command does not support slash commands yet.', 
+        ephemeral: true 
+      });
+    }
   } catch (error) {
     console.error(`Error executing slash command ${interaction.commandName}:`, error);
     
-    const replyOptions = {
-      content: 'There was an error executing this command!',
-      ephemeral: true
-    };
-    
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp(replyOptions);
-    } else {
-      await interaction.reply(replyOptions);
+    // Only try to respond if the interaction hasn't been acknowledged
+    try {
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({
+          content: 'There was an error executing this command!',
+          ephemeral: true
+        });
+      } else if (interaction.deferred) {
+        await interaction.followUp({
+          content: 'There was an error executing this command!',
+          ephemeral: true
+        });
+      }
+    } catch (responseError) {
+      console.error('Failed to send error response:', responseError);
     }
   }
 }
@@ -178,7 +199,7 @@ async function handleCommandInteraction(interaction: CommandInteraction): Promis
  * Register slash commands with Discord API
  * @param commands The commands to register
  */
-async function registerSlashCommands(commands: any[]): Promise<void> {
+async function registerSlashCommands(commands: CommandType[]): Promise<void> {
   try {
     console.log('Registering slash commands with Discord API...');
     
@@ -186,7 +207,7 @@ async function registerSlashCommands(commands: any[]): Promise<void> {
     
     const slashCommands = commands
       .filter(cmd => cmd.slashCommand)
-      .map(cmd => cmd.slashCommand.toJSON());
+      .map(cmd => cmd.slashCommand?.toJSON());
     
     if (config.devGuildId) {
       // Register commands to a specific guild (faster for development)
