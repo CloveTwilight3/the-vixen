@@ -8,7 +8,7 @@ export const PKSystemCommand: CommandType = {
   aliases: ['pks', 'system'],
   isPluralKitCommand: true,
   
-  async execute(message: Message, args: string[]) {
+    async execute(message: Message, args: string[]) {
     // Get the target system ID or user
     const targetId = args[0] || message.author.id;
     
