@@ -1,3 +1,174 @@
+#!/bin/bash
+# Script to deploy The Vixen bot with TypeScript fixes
+
+echo "Applying TypeScript fixes..."
+
+# Create directories if they don't exist
+mkdir -p src/commands/pluralkit
+
+# Apply member.ts fix
+cat > src/commands/pluralkit/member.ts << 'EOL'
+import { Message, EmbedBuilder } from 'discord.js';
+import { CommandType } from '../index';
+import { PKMember } from '../../integrations/pluralkit';
+
+export const PKMemberCommand: CommandType = {
+  name: 'pkmember',
+  description: 'Get information about a PluralKit system member',
+  aliases: ['pkm', 'member'],
+  isPluralKitCommand: true,
+  
+  async execute(message: Message, args: string[]): Promise<void> {
+    // Check if a member ID was provided
+    if (!args[0]) {
+      await message.reply('Please provide a member ID or use `!pksystem` to view your system first.');
+      return;
+    }
+    
+    const memberId = args[0];
+    
+    // Show a "processing" message
+    const reply = await message.reply('Fetching member information...');
+    
+    try {
+      // Fetch member info from PluralKit API
+      const member = await message.client.pluralKitService.getMember(memberId);
+      
+      if (!member) {
+        await reply.edit(`No PluralKit member found with ID "${memberId}".`);
+        return;
+      }
+      
+      // Create an embed with member info
+      const embed = createMemberEmbed(member);
+      
+      // Edit the reply with the embed
+      await reply.edit({ content: null, embeds: [embed] });
+    } catch (error) {
+      console.error('Error executing pkmember command:', error);
+      await reply.edit('There was an error fetching member information.');
+    }
+  }
+};
+
+/**
+ * Create an embed for member information
+ * @param member The PluralKit member
+ * @returns Discord embed
+ */
+function createMemberEmbed(member: PKMember): EmbedBuilder {
+  const embed = new EmbedBuilder()
+    .setTitle(member.name + (member.display_name ? ` (${member.display_name})` : ''))
+    .setDescription(member.description || 'No description')
+    .setColor(member.color ? `#${member.color}` : '#7856ff')
+    .addFields(
+      { name: 'ID', value: member.id, inline: true }
+    )
+    .setFooter({ text: 'PluralKit Member' });
+  
+  // Add birthday if available
+  if (member.birthday) {
+    embed.addFields({ name: 'Birthday', value: member.birthday, inline: true });
+  }
+  
+  // Add pronouns if available
+  if (member.pronouns) {
+    embed.addFields({ name: 'Pronouns', value: member.pronouns, inline: true });
+  }
+  
+  // Add created date if available
+  if (member.created) {
+    embed.setTimestamp(new Date(member.created));
+  }
+  
+  // Add proxy tags if available
+  if (member.prefix || member.suffix) {
+    const proxyTags = `${member.prefix || ''}text${member.suffix || ''}`;
+    embed.addFields({ name: 'Proxy Tags', value: `\`${proxyTags}\``, inline: true });
+  }
+  
+  // Add avatar if available
+  if (member.avatar_url) {
+    embed.setThumbnail(member.avatar_url);
+  }
+  
+  return embed;
+}
+EOL
+
+# Apply system.ts fix
+cat > src/commands/pluralkit/system.ts << 'EOL'
+import { Message, EmbedBuilder } from 'discord.js';
+import { CommandType } from '../index';
+import { PKSystem } from '../../integrations/pluralkit';
+
+export const PKSystemCommand: CommandType = {
+  name: 'pksystem',
+  description: 'Get information about a PluralKit system',
+  aliases: ['pks', 'system'],
+  isPluralKitCommand: true,
+  
+  async execute(message: Message, args: string[]): Promise<void> {
+    // Get the target system ID or user
+    const targetId = args[0] || message.author.id;
+    
+    // Show a "processing" message
+    const reply = await message.reply('Fetching system information...');
+    
+    try {
+      // Fetch system info from PluralKit API
+      const system = await message.client.pluralKitService.getSystem(targetId);
+      
+      if (!system) {
+        await reply.edit(`No PluralKit system found for ${targetId === message.author.id ? 'you' : targetId}.`);
+        return;
+      }
+      
+      // Create an embed with system info
+      const embed = createSystemEmbed(system);
+      
+      // Edit the reply with the embed
+      await reply.edit({ content: null, embeds: [embed] });
+    } catch (error) {
+      console.error('Error executing pksystem command:', error);
+      await reply.edit('There was an error fetching system information.');
+    }
+  }
+};
+
+/**
+ * Create an embed for system information
+ * @param system The PluralKit system
+ * @returns Discord embed
+ */
+function createSystemEmbed(system: PKSystem): EmbedBuilder {
+  const embed = new EmbedBuilder()
+    .setTitle(system.name)
+    .setDescription(system.description || 'No description')
+    .setColor(system.color ? `#${system.color}` : '#7856ff')
+    .addFields(
+      { name: 'ID', value: system.id, inline: true },
+      { name: 'Members', value: system.member_count?.toString() || 'Unknown', inline: true }
+    )
+    .setFooter({ text: 'PluralKit System' })
+    .setTimestamp(new Date(system.created));
+  
+  // Add system tag if available
+  if (system.tag) {
+    embed.addFields({ name: 'Tag', value: system.tag, inline: true });
+  }
+  
+  // Add avatar if available
+  if (system.avatar_url) {
+    embed.setThumbnail(system.avatar_url);
+  }
+  
+  return embed;
+}
+EOL
+
+# Apply switch.ts fix
+cat > src/commands/pluralkit/switch.ts << 'EOL'
 import { Message, EmbedBuilder } from 'discord.js';
 import { CommandType } from '../index';
 import { PKMember, PKSwitch } from '../../integrations/pluralkit';
@@ -200,3 +371,42 @@ function getTimeAgo(date: Date): string {
   
   return Math.floor(seconds) + ' seconds';
 }
+EOL
+
+# Update Dockerfile to use Node 20
+cat > Dockerfile << 'EOL'
+FROM node:20-alpine
+
+# Create app directory
+WORKDIR /usr/src/app
+
+# Install Python (needed for the run-bot.py script)
+RUN apk add --update python3
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Create data directory
+RUN mkdir -p data
+
+# Build the TypeScript code
+RUN npm run build
+
+# Expose the port the app runs on (if your bot uses HTTP)
+# EXPOSE 3000
+
+# Command to run the app
+CMD ["npm", "start"]
+EOL
+
+echo "TypeScript fixes applied and Dockerfile updated to use Node.js 20"
+echo "You can now build the Docker container with: docker-compose up -d --build"
+
+# Make the script executable
+chmod +x deploy.sh

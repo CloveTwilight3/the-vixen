@@ -8,10 +8,11 @@ export const PKMemberCommand: CommandType = {
   aliases: ['pkm', 'member'],
   isPluralKitCommand: true,
   
-  async execute(message: Message, args: string[]) {
+  async execute(message: Message, args: string[]): Promise<void> {
     // Check if a member ID was provided
     if (!args[0]) {
-      return message.reply('Please provide a member ID or use `!pksystem` to view your system first.');
+      await message.reply('Please provide a member ID or use `!pksystem` to view your system first.');
+      return;
     }
     
     const memberId = args[0];
@@ -24,7 +25,8 @@ export const PKMemberCommand: CommandType = {
       const member = await message.client.pluralKitService.getMember(memberId);
       
       if (!member) {
-        return reply.edit(`No PluralKit member found with ID "${memberId}".`);
+        await reply.edit(`No PluralKit member found with ID "${memberId}".`);
+        return;
       }
       
       // Create an embed with member info

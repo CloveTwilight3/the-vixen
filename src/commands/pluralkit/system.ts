@@ -8,7 +8,7 @@ export const PKSystemCommand: CommandType = {
   aliases: ['pks', 'system'],
   isPluralKitCommand: true,
   
-    async execute(message: Message, args: string[]) {
+  async execute(message: Message, args: string[]): Promise<void> {
     // Get the target system ID or user
     const targetId = args[0] || message.author.id;
     
@@ -20,7 +20,8 @@ export const PKSystemCommand: CommandType = {
       const system = await message.client.pluralKitService.getSystem(targetId);
       
       if (!system) {
-        return reply.edit(`No PluralKit system found for ${targetId === message.author.id ? 'you' : targetId}.`);
+        await reply.edit(`No PluralKit system found for ${targetId === message.author.id ? 'you' : targetId}.`);
+        return;
       }
       
       // Create an embed with system info

@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Create app directory
 WORKDIR /usr/src/app
@@ -15,11 +15,17 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build the TypeScript code
-RUN npm run build
-
 # Create data directory
 RUN mkdir -p data
+
+# Apply TypeScript fixes
+# Copy the fixed files
+COPY ./src/commands/pluralkit/member.ts ./src/commands/pluralkit/member.ts
+COPY ./src/commands/pluralkit/system.ts ./src/commands/pluralkit/system.ts
+COPY ./src/commands/pluralkit/switch.ts ./src/commands/pluralkit/switch.ts
+
+# Build the TypeScript code
+RUN npm run build
 
 # Expose the port the app runs on (if your bot uses HTTP)
 # EXPOSE 3000
